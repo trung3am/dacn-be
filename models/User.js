@@ -8,9 +8,13 @@ class User {
   constructor() {
 
   }
+  async verifyAccount (email) {
+    return await MongoDBService.update('users', {email:email} ,{ $set:{verify:true}});
+  }
   async createNewUserWithPassword (email, password) {
     let hash  = await bcrypt.hash(password, saltRounds);
     let user = {email:email , 
+      verify:false,
       Local:{password: hash,
          email: email},
       events:[],
@@ -35,14 +39,14 @@ class User {
 
     let user = await MongoDBService.findOne('users',{email:email});
     let hash = "";
-    if(user.length != 0) {
+    if(user && user.length != 0) {
       hash = user.Local.password;
     }
     console.log(user);
     let check =  await bcrypt.compare(password,hash);
     console.log(check);
     if (check) {
-      return user._id;
+      return {_id:user._id.toString(), verify:user.verify};
     }
     return;
     
@@ -59,6 +63,11 @@ class User {
     
     return await MongoDBService.update('users', {email:email} ,{ $set:{Local:Local}});
   }
+  async updateTask(email,tasks) {
+    return await MongoDBService.update('users', {email:email} ,{ $set:{tasks:tasks}});
+  }
+  
 }
+
 
 module.exports = new User();

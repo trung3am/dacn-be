@@ -1,6 +1,6 @@
 const mailer = require('nodemailer');
 
-const SendMail = async (email, secret) => {
+const SendMail = async (email, subject, msg, url) => {
   smtpProtocol = mailer.createTransport({
     service: "Gmail",
     auth: {
@@ -8,14 +8,15 @@ const SendMail = async (email, secret) => {
         pass: process.env.APPPW
     }
 });
-let url = process.env.URL +'/newpassword?key=' + secret;
+
 let mailoption = {
     from: process.env.MAIL,
     to: email,
-    subject: "TimeTable reset your password",
-    html: 'follow current link to reset your password: ' + url
+    subject: subject ,
+    html:  msg + url
 }
 
+console.log(mailoption);
 smtpProtocol.sendMail(mailoption, function(err, response){
     if(err) {
         console.log(err);
