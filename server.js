@@ -78,7 +78,8 @@ async function NotificationApi (expo_token, title, sub, body)  {
 const rule = new schedule.RecurrenceRule();
 rule.second = process.env.INTERVAL_SECOND;
 
-if(process.env.TIMER) {
+if(process.env.TIMER==='true') {
+  console.log("run timer");
   const job = schedule.scheduleJob(rule, async function(){
     let users = await User.getAllUsers();
     for (const i of users) {
