@@ -87,7 +87,7 @@ if(process.env.TIMER) {
         for (const k in i.devices) {
           if (Object.hasOwnProperty.call(i.devices, k)) {
             if (k) {
-              if (i.devices[k].appNotification) {
+              if (i.devices[k].appNotification && i.tasks.task) {
                 console.log("send noti to apps");
                 for (let j of i.tasks.task) {
                   if (!j.due || j.noti_sent) continue;
@@ -102,7 +102,7 @@ if(process.env.TIMER) {
                   
                 }
               }
-              if (i.devices[k].emailNotification) {
+              if (i.devices[k].emailNotification && i.tasks.task) {
                 console.log("send noti to email");
                 for (let j of i.tasks.task) {
                   if (!j.due) continue;
