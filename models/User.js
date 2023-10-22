@@ -17,15 +17,15 @@ class User {
       verify:false,
       Local:{password: hash,
          email: email},
-      events:[],
-      tasks:[],
-      reminders:[],
-      notes:[],
+      events:{},
+      tasks:{},
+      reminders:{},
+      notes:{},
       avatar_image:null,
       phone:null,
       facebook:{id:null, email:null},
-      google:{id:null, email:null}
-
+      google:{id:null, email:null},
+      devices:{}
         };
     try {
       let res = await MongoDBService.insert('users', [user
@@ -46,7 +46,7 @@ class User {
     let check =  await bcrypt.compare(password,hash);
     console.log(check);
     if (check) {
-      return {_id:user._id.toString(), verify:user.verify};
+      return {_id:user._id.toString(), verify:user.verify, devices:user.devices};
     }
     return;
     
@@ -66,7 +66,12 @@ class User {
   async updateTask(email,tasks) {
     return await MongoDBService.update('users', {email:email} ,{ $set:{tasks:tasks}});
   }
-  
+  async updateDevice(email,devices) {
+    return await MongoDBService.update('users', {email:email} ,{ $set:{devices:devices}});
+  }
+  async getAllUsers() {
+    return await MongoDBService.find('users');
+  }
 }
 
 
