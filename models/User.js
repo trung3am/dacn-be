@@ -66,6 +66,15 @@ class User {
   async updateTask(email,tasks) {
     return await MongoDBService.update('users', {email:email} ,{ $set:{tasks:tasks}});
   }
+  async saveGoogleCalendarEvent(email,gmail ,events) {
+    let user = await this.getUser({email:email});
+    let google_events = user.google_events;
+    if(!google_events) {
+      google_events = {};
+    }
+    google_events[gmail] = events;
+    return await MongoDBService.update('users', {email:email} ,{ $set:{google_events:google_events}});
+  }
   async updateDevice(email,devices) {
     return await MongoDBService.update('users', {email:email} ,{ $set:{devices:devices}});
   }

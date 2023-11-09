@@ -1,3 +1,4 @@
+/*  EXPRESS */
 const express = require('express');
 require('dotenv').config();
 const cors = require('cors')
@@ -6,7 +7,7 @@ const jwt = require('jsonwebtoken');
 const app = express();
 app.use(cors());
 const auth = require('./middleware/auth');
-app.use(express.json())
+app.use(express.json({limit: '35mb'}))
 const PORT = process.env.PORT;
 const SALT = process.env.SALT;
 const BEURL = process.env.BEURL  || "http://localhost:8088"
@@ -18,6 +19,9 @@ let resetlist = {};
 const { v4: uuidv4 } = require('uuid');
 const schedule = require('node-schedule');
 const axios = require('axios');
+const fs = require('fs');
+const {Leopard} = require("@picovoice/leopard-node");
+
 function _Task(email,title, description, start_time, end_time, frequency=undefined) {
   return {
     created_by:email,
@@ -106,7 +110,7 @@ if(process.env.TIMER==='true') {
               if (i.devices[k].emailNotification && i.tasks.task) {
                 console.log("send noti to email");
                 for (let j of i.tasks.task) {
-                  if (!j.due) continue;
+                  if (!j.due || j.noti_sent) continue;
                   let due = new Date(j.due);
                   if(due.getTime() <= Date.now() + 400000) {
                     change = true;
@@ -368,30 +372,30 @@ router.get('/users/verifyreset', async (req,res) => {
   }
 });
 
-router.post('/task/create',auth, async (req,res)=> {
+// router.post('/task/create',auth, async (req,res)=> {
 
-  try {
-    let user = req.user;
+//   try {
+//     let user = req.user;
     
-    if(!user) {
-      res.status(400).send("bad request");
-      return;
-    }
-    if (!req.body || !req.body.title || !req.body.description || !req.body.start_time || !req.body.end_time) {
-      res.status(400).send("bad request");
-      return;
-    }
-    let newTask = _Task(req.user.email, req.body.title, req.body.description, req.body.start_time, req.body.end_time, req.body.frequency);
-    let tasks = user.tasks;
-    tasks.push(newTask);
-    console.log(user);
-    await User.updateTask(user.email, tasks);
-    res.status(200).send("OK")
-  } catch (error) {
-    console.log(error);
-    res.status(400).send("bad request");
-  }
-})
+//     if(!user) {
+//       res.status(400).send("bad request");
+//       return;
+//     }
+//     if (!req.body || !req.body.title || !req.body.description || !req.body.start_time || !req.body.end_time) {
+//       res.status(400).send("bad request");
+//       return;
+//     }
+//     let newTask = _Task(req.user.email, req.body.title, req.body.description, req.body.start_time, req.body.end_time, req.body.frequency);
+//     let tasks = user.tasks;
+//     tasks.push(newTask);
+//     console.log(user);
+//     await User.updateTask(user.email, tasks);
+//     res.status(200).send("OK")
+//   } catch (error) {
+//     console.log(error);
+//     res.status(400).send("bad request");
+//   }
+// })
 
 router.post('/task/update',auth, async (req,res)=> {
   try {
@@ -440,8 +444,11 @@ router.get('/tasks/get',auth,async(req,res) => {
       res.status(400).send("bad request");
       return;
     }
-    if(!user.tasks) user.tasks = {};
-    res.status(200).send(user.tasks);
+    let tasks = {};
+    if(user.tasks) tasks = user.tasks;
+    if(user.google_events) tasks.google_events = user.google_events;
+    
+    res.status(200).send(tasks);
   } catch (error) {
     console.log(error);
     res.status(400).send("bad request");
@@ -474,8 +481,176 @@ router.get('/users/profile', auth, async (req,res) => {
   res.send(req.user);
 });
 
+router.post('/audio',  async  (req,res) => {
+  const DETAIL = {
+    details:true,
+    detail:true,
+  }
+  const TASK = {
+    tasks:true,
+    task:true,
+  }
+  const SHOW = {
+    show:true,
+    shows:true,
+    shown:true,
+    showed:true,
+    tell: true,
+    tells: true,
+
+  }
+  const SHOW_TASK = "SHOW_TASK";
+  const SHOW_DETAIL = "SHOW_DETAIL";
+
+  function _process(token) {
+    if(DETAIL[token]) return "DETAIL";
+    if(SHOW[token]) return "SHOW";
+    if(TASK[token]) return "TASK";
+  }
+  try {
+
+
+
+    if(!req || !req.body || !req.body.audio) {
+      
+      res.status(200).send("Please repeat");
+      // return;
+    }
+    let f = 'audio.wav' + uuidv4();
+
+    fs.writeFileSync(f,req.body.audio, 'base64');
+    const handle = new Leopard(process.env.PICOKEY);
+    const result = handle.processFile(f);
+    fs.unlinkSync(f);
+    console.log(result.transcript);
+    let chunk = result.transcript.toLowerCase().split(' ');
+    let intent = {};
+    for (const i of chunk) {
+      let t = _process(i);
+      intent[t] = true;
+    }
+    let _intent =""
+    if(intent["SHOW"] && intent["TASK"]) _intent=SHOW_TASK;
+    if(intent["DETAIL"]) _intent=DETAIL;
+    console.log(_intent);
+    res.status(200).send(_intent);
+
+    // return;
+
+  } catch (error) {
+    console.log(error);
+    res.status(200).send("Please repeat");
+    // return
+  }
+} )
+
 app.use(router);
 
-app.listen(PORT, () => {
-  console.log("listen on port: " + PORT);
-})
+
+
+const session = require('express-session');
+
+
+
+app.use(session({
+  maxAge: 86400000,
+  resave: true,
+  saveUninitialized: true,
+  secret: 'SECRET' 
+}));
+
+
+var passport = require('passport');
+
+ 
+app.use(passport.initialize());
+app.use(passport.session());
+ 
+
+app.get('/error', (req, res) => res.send("<h1>Error Sync failed"));
+ 
+passport.serializeUser(function(user, cb) {
+  cb(null, user);
+});
+ 
+passport.deserializeUser(function(obj, cb) {
+  cb(null, obj);
+});
+
+
+/*  Google AUTH  */
+ 
+var GoogleStrategy = require('passport-google-oauth').OAuth2Strategy;
+
+console.log(process.env.CLIENT_ID);
+console.log(process.env.CLIENT_SECRET);
+
+passport.use(new GoogleStrategy({
+    clientID: process.env.CLIENT_ID,
+    clientSecret: process.env.CLIENT_SECRET,
+    callbackURL: "http://localhost:8088/auth/google/callback"
+  },
+  async function(accessToken, refreshToken, profile, done) {
+    
+      const email = profile.emails[0].value;
+      const data ={email: email, token: accessToken};
+      console.log(data);
+
+
+      return done(null,data);
+  }
+));
+ 
+app.get('/auth/google', function(req,res,next) {
+  const state = req.query.appemail;
+
+  const authenticator = passport.authenticate('google', 
+{ scope : ['profile', 'email','https://www.googleapis.com/auth/calendar','https://www.googleapis.com/auth/tasks'] ,
+state
+}
+)
+  authenticator(req, res, next);
+},  
+  );
+ 
+app.get('/auth/google/callback', 
+  passport.authenticate('google', { failureRedirect: '/error' }),
+  async function  (req, res) {
+    // Successful authentication, redirect success.
+    console.log();
+    console.log(req.session);
+    const appemail = req.query.state;
+    const email = req.session.passport.user.email;
+    const token = req.session.passport.user.token;
+    let user = await User.getUser({email: appemail});
+    if (!user){
+      res.status(200).send("<h1>Sync failed, appemail is invalid!</h1>");
+      return;
+    }
+    try {
+      axios({
+        method: 'get',
+        url: `https://www.googleapis.com/calendar/v3/calendars/${email}/events`,
+        headers: {
+          Authorization: "Bearer " + token
+        }
+      }).then((res)=> {
+        User.saveGoogleCalendarEvent(appemail, email, res.data.items);
+        console.log(res.data.items);
+      });
+    } catch (error) {
+      res.status(200).send(error);
+      return;
+    }
+    res.status(200).send(`<h1>Synced google calendar events of ${email} into ${appemail} accounts success! </h1>`)
+  });
+
+// function getReqSessionId(req, res, next) {
+//   console.log(req.session);
+//   next();
+// }
+
+  app.listen(PORT, () => {
+    console.log("listen on port: " + PORT);
+  })
+  
