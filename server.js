@@ -234,7 +234,7 @@ router.post('/users/login',async (req,res) => {
       // }
       
       token = jwt.sign({_id:user._id }, SALT);
-      res.status(200).send({user:req.body.email, token:token, settings:settings});
+      res.status(200).send({user:req.body.email, phone_number: user.phone_number || '',name: user.name || '', token:token, settings:settings, google_ref: user.google_ref || {}});
       
     } else {
       res.status(400).send("Bad request");
@@ -268,6 +268,31 @@ router.post('/users/settings', auth, async (req,res) => {
   } else {
     res.status(400).send("Bad request");
   }
+});
+
+router.get('/users/get', auth, async (req,res) => {
+
+    let user = req.user;
+    if(!user) {
+      res.status(400).send("bad request");
+      return;
+    } else {
+      res.status(200).send(user);
+    }
+
+});
+
+router.post('/users/update', auth, async (req,res) => {
+
+    let user = req.user;
+    if(!user) {
+      res.status(400).send("bad request");
+      return;
+    } else {
+      await User.updateUser(user.email,{name: req.body.name, phone_number:req.body.phone_number});
+      res.status(200).send("OK");
+    }
+
 });
 
 router.post('/users/changepassword', auth, async (req,res) => {
@@ -481,6 +506,59 @@ router.get('/users/profile', auth, async (req,res) => {
   res.send(req.user);
 });
 
+router.get('/sync/google' , auth, async (req, res) => {
+
+  
+  
+  let user = req.user;
+  const email = req.user.email;
+
+  if (user && user.google_ref) {
+    for (const k in user.google_ref) {
+      if (Object.hasOwnProperty.call(user.google_ref, k)) {
+        const i = user.google_ref[k];
+        if (i.is_expired) continue;
+        try {
+          let data = await axios({
+            method: 'post',
+            url: `https://oauth2.googleapis.com/token?client_id=${process.env.CLIENT_ID}&client_secret=${process.env.CLIENT_SECRET}&grant_type=refresh_token&refresh_token=${i.ref_token}`
+          })
+          // console.log(data);
+          let token = data.data.access_token;
+          try {
+
+            console.log(token);
+            axios({
+              method: 'get',
+              url: `https://www.googleapis.com/calendar/v3/calendars/${k}/events`,
+              headers: {
+                Authorization: "Bearer " + token
+              }
+            }).then((res)=> {
+              
+              User.saveGoogleCalendarEvent(email, k, res.data.items);
+            });
+          } catch (error) {
+            res.status(200).send("SYNCED FAILED");
+            console.log(error);
+          }
+
+        } catch (error) {
+          console.log(error);
+          let new_i = i;
+          new_i.is_expired = true;
+          console.log(new_i);
+          User.updateGoogleRefreshToken(email, new_i);
+          res.status(200).send("OK");
+
+          // return;
+        }
+      }
+    }
+  }
+  res.status(200).send("OK");
+} )
+
 router.post('/audio',  async  (req,res) => {
   const DETAIL = {
     details:true,
@@ -591,10 +669,10 @@ passport.use(new GoogleStrategy({
     callbackURL: process.env.CALLBACK_URL
   },
   async function(accessToken, refreshToken, profile, done) {
-    
+      console.log("refresh" + refreshToken);
       const email = profile.emails[0].value;
-      const data ={email: email, token: accessToken};
-      console.log(data);
+      const data ={email: email, token: refreshToken};
+      // console.log(data);
 
 
       return done(null,data);
@@ -606,7 +684,7 @@ app.get('/auth/google', function(req,res,next) {
 
   const authenticator = passport.authenticate('google', 
 { scope : ['profile', 'email','https://www.googleapis.com/auth/calendar','https://www.googleapis.com/auth/tasks'] ,
-state
+state, accessType: 'offline',
 }
 )
   authenticator(req, res, next);
@@ -617,32 +695,19 @@ app.get('/auth/google/callback',
   passport.authenticate('google', { failureRedirect: '/error' }),
   async function  (req, res) {
     // Successful authentication, redirect success.
-    console.log();
-    console.log(req.session);
+
     const appemail = req.query.state;
     const email = req.session.passport.user.email;
     const token = req.session.passport.user.token;
+    // console.log(req.session.passport);
     let user = await User.getUser({email: appemail});
     if (!user){
       res.status(200).send("<h1>Sync failed, appemail is invalid!</h1>");
       return;
     }
-    try {
-      axios({
-        method: 'get',
-        url: `https://www.googleapis.com/calendar/v3/calendars/${email}/events`,
-        headers: {
-          Authorization: "Bearer " + token
-        }
-      }).then((res)=> {
-        User.saveGoogleCalendarEvent(appemail, email, res.data.items);
-        console.log(res.data.items);
-      });
-    } catch (error) {
-      res.status(200).send(error);
-      return;
-    }
-    res.status(200).send(`<h1>Synced google calendar events of ${email} into ${appemail} accounts success! </h1>`)
+    User.updateGoogleRefreshToken(appemail, {email: email, token: token});
+
+    res.status(200).send(`<h1>Authorized google calendar events of ${email} into ${appemail} accounts success! </h1>`)
   });
 
 // function getReqSessionId(req, res, next) {

@@ -46,7 +46,7 @@ class User {
     let check =  await bcrypt.compare(password,hash);
     console.log(check);
     if (check) {
-      return {_id:user._id.toString(), verify:user.verify, devices:user.devices};
+      return {_id:user._id.toString(), verify:user.verify, devices:user.devices, phone_number: user.phone_number, name: user.name, google_ref: user.google_ref};
     }
     return;
     
@@ -78,8 +78,22 @@ class User {
   async updateDevice(email,devices) {
     return await MongoDBService.update('users', {email:email} ,{ $set:{devices:devices}});
   }
+  async updateGoogleRefreshToken(email, token) {
+    let user = await this.getUser({email:email});
+    let ref = {};
+    if (user.google_ref) ref = user.google_ref;
+    ref[token.email] = {
+      ref_token: token.token,
+      email: token.email,
+      is_expired: false
+    }
+    
+  }
   async getAllUsers() {
     return await MongoDBService.find('users');
+  }
+  async updateUser(email, update) {
+    return await MongoDBService.update('users', {email:email} ,{ $set:update});
   }
 }
 
