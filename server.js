@@ -21,6 +21,7 @@ const schedule = require('node-schedule');
 const axios = require('axios');
 const fs = require('fs');
 const {Leopard} = require("@picovoice/leopard-node");
+const entity = require("./entities/entities");
 
 function _Task(email,title, description, start_time, end_time, frequency=undefined) {
   return {
@@ -560,30 +561,29 @@ router.get('/sync/google' , auth, async (req, res) => {
 } )
 
 router.post('/audio',  async  (req,res) => {
-  const DETAIL = {
-    details:true,
-    detail:true,
-  }
-  const TASK = {
-    tasks:true,
-    task:true,
-  }
-  const SHOW = {
-    show:true,
-    shows:true,
-    shown:true,
-    showed:true,
-    tell: true,
-    tells: true,
-
-  }
+  
+  
+  // intent
   const SHOW_TASK = "SHOW_TASK";
   const SHOW_DETAIL = "SHOW_DETAIL";
+  const SELECT_TASK = "SELECT_TASK";
+  const DIRECT  = "DIRECT";
+  const SET_NOTI = "SET_NOTI";
+  const SET_DUE = "SET_DUE";
+  const SET_REMINDER = "SET_REMINDER";
+  const DETAIL_TASK = "DETAIL_TASK";
+  const YES = "YES";
+  const CANCEL = "CANCEL";
+  const CREATE = "CREATE";
 
   function _process(token) {
-    if(DETAIL[token]) return "DETAIL";
-    if(SHOW[token]) return "SHOW";
-    if(TASK[token]) return "TASK";
+    for (const k in entity) {
+      if (Object.hasOwnProperty.call(entity, k)) {
+        if(entity[k][token]) return k;
+        
+      }
+    }
+
   }
   try {
 
@@ -605,13 +605,44 @@ router.post('/audio',  async  (req,res) => {
     let intent = {};
     for (const i of chunk) {
       let t = _process(i);
-      intent[t] = true;
+      if(t =="NUMBER") {
+        intent[t] = entity.NUMBER[i];
+      } else {
+        intent[t] = true;
+      }
     }
-    let _intent =""
-    if(intent["SHOW"] && intent["TASK"]) _intent=SHOW_TASK;
-    if(intent["DETAIL"]) _intent=DETAIL;
+    //intent curating
+    let _intent ="";
+    let _info = {};
+    if(intent["NUMBER"] || intent["NUMBER"] == 0) {
+      _info.number = intent["NUMBER"];
+      intent["NUMBER"] = 1;
+    }
+    if(intent["AMPM"]) _info.ampm = intent["AMPM"];
+    if(intent["TODAY"]) _info.day = "TODAY";
+    if(intent["NEXT_DAY"]) _info.day = "NEXT_DAY";
+    if(intent["EVENING"]) _info.time = "EVENING";
+    if(intent["AFTERNOON"]) _info.time = "AFTERNOON";
+    if(intent["MORNING"]) _info.time = "MORNING";
+    if(intent["ON"]) _info.noti_status = "on"
+    if(intent["OFF"]) _info.noti_status = "off"
+    
+    if(intent["TASK"] && intent["SHOW"]) _intent=SHOW_TASK;
+    if(intent["DETAIL"] && intent["TASK"]) _intent=SHOW_DETAIL;
+    if(intent["SELECT"] && intent["NUMBER"]) _intent=SELECT_TASK;
+    
+    if(intent["SET"]) {
+      if(intent["NOTIFICATION"]) _intent=SET_NOTI;
+      if(intent["DUE"]) _intent=SET_DUE;
+      if(intent["REMINDER"]) _intent=SET_REMINDER;
+    }
+    if(intent["CREATE"]) _intent=CREATE;
+    if(intent["DIRECT"]) _intent=DIRECT;
+    if(intent["CANCEL"]) _intent=CANCEL;
+    if(intent["YES"]) _intent=YES;
+
     console.log(_intent);
-    res.status(200).send(_intent);
+    res.status(200).send({intent: _intent, result: result.transcript , info:_info});
 
     // return;
 
