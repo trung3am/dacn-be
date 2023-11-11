@@ -199,7 +199,7 @@ router.post('/users/login',async (req,res) => {
         res.status(401).send("unauthorized");
         return;
       }
-      let settings = {appNotification: true, emailNotification:false};
+
       let devices = user.devices;
       console.log(devices);
       if (devices && req.body.device && !devices[req.body.device]) {
@@ -211,6 +211,7 @@ router.post('/users/login',async (req,res) => {
         devices[req.body.device]={appNotification: true, emailNotification:false};
         await User.updateDevice(req.body.email, devices);
       }
+      let settings = {appNotification: true, emailNotification:false};
       if (req.body.device && devices[req.body.device]) {
         settings=  devices[req.body.device]
       }
@@ -233,7 +234,14 @@ router.post('/users/login',async (req,res) => {
       //   }
         
       // }
-      
+      if (user.google_ref) {
+        for (const k in user.google_ref) {
+          if (Object.hasOwnProperty.call(user.google_ref, k)) {
+            delete user.google_ref[k].ref_token;
+            
+          }
+        }
+      }
       token = jwt.sign({_id:user._id }, SALT);
       res.status(200).send({user:req.body.email, phone_number: user.phone_number || '',name: user.name || '', token:token, settings:settings, google_ref: user.google_ref || {}});
       
@@ -278,7 +286,21 @@ router.get('/users/get', auth, async (req,res) => {
       res.status(400).send("bad request");
       return;
     } else {
-      res.status(200).send(user);
+      if (user.google_ref) {
+        for (const k in user.google_ref) {
+          if (Object.hasOwnProperty.call(user.google_ref, k)) {
+            delete user.google_ref[k].ref_token;
+            
+          }
+        }
+      }
+      let settings = {appNotification: true, emailNotification:false};
+      if (req.body.device && devices[req.body.device]) {
+        settings=  devices[req.body.device]
+      }
+      let data = {user:user.email, phone_number: user.phone_number || '',name: user.name || '', settings:settings, google_ref: user.google_ref || {}};
+      console.log(data);
+      res.status(200).send(data);
     }
 
 });

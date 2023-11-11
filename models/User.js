@@ -85,9 +85,10 @@ class User {
     ref[token.email] = {
       ref_token: token.token,
       email: token.email,
-      is_expired: false
+      is_expired: false,
+      sync: true
     }
-    
+    return await this.updateUser(email, {google_ref: ref});
   }
   async getAllUsers() {
     return await MongoDBService.find('users');
