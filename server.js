@@ -243,6 +243,7 @@ router.post('/users/login',async (req,res) => {
         }
       }
       token = jwt.sign({_id:user._id }, SALT);
+      console.log(user._id);
       res.status(200).send({user:req.body.email, phone_number: user.phone_number || '',name: user.name || '', token:token, settings:settings, google_ref: user.google_ref || {}});
       
     } else {
@@ -486,12 +487,59 @@ router.post('/task/update',auth, async (req,res)=> {
 } )
 
 router.get('/tasks/get',auth,async(req,res) => {
+
   try {
     let user = req.user;
     if(!user) {
       res.status(400).send("bad request");
       return;
     }
+
+    const email = req.user.email;
+  
+    if (user && user.google_ref) {
+      for (const k in user.google_ref) {
+        if (Object.hasOwnProperty.call(user.google_ref, k)) {
+          const i = user.google_ref[k];
+          if (i.is_expired) continue;
+          try {
+            let data = await axios({
+              method: 'post',
+              url: `https://oauth2.googleapis.com/token?client_id=${process.env.CLIENT_ID}&client_secret=${process.env.CLIENT_SECRET}&grant_type=refresh_token&refresh_token=${i.ref_token}`
+            })
+            // console.log(data);
+            let token = data.data.access_token;
+            try {
+  
+              console.log(token);
+              let res = await axios({
+                method: 'get',
+                url: `https://www.googleapis.com/calendar/v3/calendars/${k}/events`,
+                headers: {
+                  Authorization: "Bearer " + token
+                }
+              });
+              await  User.saveGoogleCalendarEvent(email, k, res.data.items);
+
+            } catch (error) {
+              // res.status(200).send("SYNCED FAILED");
+              console.log(error);
+            }
+  
+          } catch (error) {
+            console.log(error);
+            // let new_i = i;
+            // new_i.is_expired = true;
+            // console.log(new_i);
+            // User.updateGoogleRefreshToken(email, new_i);
+            // res.status(200).send("OK");
+  
+            // return;
+          }
+        }
+      }
+    }
+    // res.status(200).send("OK");
     let tasks = {};
     if(user.tasks) tasks = user.tasks;
     if(user.google_events) tasks.google_events = user.google_events;
@@ -551,28 +599,28 @@ router.get('/sync/google' , auth, async (req, res) => {
           try {
 
             console.log(token);
-            axios({
+            let res = await axios({
               method: 'get',
               url: `https://www.googleapis.com/calendar/v3/calendars/${k}/events`,
               headers: {
                 Authorization: "Bearer " + token
               }
-            }).then((res)=> {
+            })
               
-              User.saveGoogleCalendarEvent(email, k, res.data.items);
-            });
+            await  User.saveGoogleCalendarEvent(email, k, res.data.items);
+
           } catch (error) {
-            res.status(200).send("SYNCED FAILED");
+            // res.status(200).send("SYNCED FAILED");
             console.log(error);
           }
 
         } catch (error) {
           console.log(error);
-          let new_i = i;
-          new_i.is_expired = true;
-          console.log(new_i);
-          User.updateGoogleRefreshToken(email, new_i);
-          res.status(200).send("OK");
+          // let new_i = i;
+          // new_i.is_expired = true;
+          // console.log(new_i);
+          // User.updateGoogleRefreshToken(email, new_i);
+          // res.status(200).send("OK");
 
           // return;
         }
