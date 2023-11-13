@@ -96,6 +96,17 @@ class User {
   async updateUser(email, update) {
     return await MongoDBService.update('users', {email:email} ,{ $set:update});
   }
+  async removeSyncedGmail(email, gmail) {
+    let user = await this.getUser({email:email});
+    if (user.google_ref) {
+      let ref = user.google_ref;
+      delete ref[gmail];
+      console.log(ref);
+      return await MongoDBService.update('users', {email:email} ,{ $set:{google_ref: ref}});
+    }
+
+    
+  }
 }
 
 

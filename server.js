@@ -574,7 +574,20 @@ router.get('/users/avatar', auth, async (req,res) => {
 });
 router.get('/users/profile', auth, async (req,res) => {
   delete req.user.Local;
+  delete req.user.google_ref;
+  delete req.user.tasks;
+
+
   res.send(req.user);
+});
+
+router.post('/sync/remove', auth, async (req,res) => {
+  let user = req.user;
+  if(!req && !req.body && !req.body.email) {
+    res.status(400).send("bad request");
+  }
+  await User.removeSyncedGmail(user.email, req.body.email);
+  res.status(200).send("ok");
 });
 
 router.get('/sync/google' , auth, async (req, res) => {
