@@ -4,7 +4,7 @@
   "description": "",
   "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest --collect-coverage"
   },
   "author": "",
   "license": "ISC",
@@ -27,5 +27,12 @@
     "passport-google-oauth": "^2.0.0",
     "rn-crypto-js": "^1.1.2",
     "uuid": "^9.0.1"
+  },
+  "devDependencies": {
+    "babel-cli": "^6.26.0",
+    "babel-preset-env": "^1.7.0",
+    "jest": "^29.7.0",
+    "superagent": "^8.1.2",
+    "supertest": "^6.3.3"
   }
 }

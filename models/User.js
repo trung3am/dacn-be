@@ -102,6 +102,11 @@ class User {
       let ref = user.google_ref;
       delete ref[gmail];
       console.log(ref);
+      if (user.google_events) {
+        let g_events = user.google_events;
+        delete g_events[gmail];
+        return await MongoDBService.update('users', {email:email} ,{ $set:{google_ref: ref, google_events: g_events}});
+      }
       return await MongoDBService.update('users', {email:email} ,{ $set:{google_ref: ref}});
     }
 

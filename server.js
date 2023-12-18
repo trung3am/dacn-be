@@ -136,7 +136,9 @@ if(process.env.TIMER==='true') {
     console.log('Timer trigger!');
   });
 }
-
+router.get('/test',async (req, res) => {
+  res.status(200).send('OK');
+});
 
 router.get('/users/new',async (req, res) => {
   if (req && req.query && req.query.key) {
@@ -243,6 +245,7 @@ router.post('/users/login',async (req,res) => {
         }
       }
       token = jwt.sign({_id:user._id }, SALT);
+      console.log(user._id);
       console.log(user._id);
       res.status(200).send({user:req.body.email, phone_number: user.phone_number || '',name: user.name || '', token:token, settings:settings, google_ref: user.google_ref || {}});
       
@@ -551,27 +554,27 @@ router.get('/tasks/get',auth,async(req,res) => {
   }
 })
 
-router.get('/task/deleteall',async(req,res) =>{
-  if (req && req.query && req.query.email) {
-    try {
-      await User.updateTask(req.query.email,[]);
-      res.status(200).send("OK");
-    } catch (error) {
-      res.status(400).send("KO");
-    }
+// router.get('/task/deleteall',async(req,res) =>{
+//   if (req && req.query && req.query.email) {
+//     try {
+//       await User.updateTask(req.query.email,[]);
+//       res.status(200).send("OK");
+//     } catch (error) {
+//       res.status(400).send("KO");
+//     }
 
-  } 
-})
+//   } 
+// })
 
-router.post('/users/avatar',auth ,async (req,res) => {
-  if (!req.body) {
-    res.status(400).send("bad reqeust");
-  }
-});
+// router.post('/users/avatar',auth ,async (req,res) => {
+//   if (!req.body) {
+//     res.status(400).send("bad reqeust");
+//   }
+// });
 
-router.get('/users/avatar', auth, async (req,res) => {
-  res.send(req.user.avatar);
-});
+// router.get('/users/avatar', auth, async (req,res) => {
+//   res.send(req.user.avatar);
+// });
 router.get('/users/profile', auth, async (req,res) => {
   delete req.user.Local;
   delete req.user.google_ref;
@@ -736,7 +739,7 @@ router.post('/audio',  async  (req,res) => {
   }
 } )
 
-app.use(router);
+
 
 
 
@@ -829,7 +832,10 @@ app.get('/auth/google/callback',
 //   next();
 // }
 
+
+app.use(router);
   app.listen(PORT, () => {
     console.log("listen on port: " + PORT);
   })
   
+module.exports = app;
