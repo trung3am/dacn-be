@@ -82,11 +82,15 @@ class User {
     let user = await this.getUser({email:email});
     let ref = {};
     if (user.google_ref) ref = user.google_ref;
-    ref[token.email] = {
-      ref_token: token.token,
-      email: token.email,
-      is_expired: false,
-      sync: true
+    if (ref[token.email]) {
+      ref[token.email].sync = true;
+    } else {
+      ref[token.email] = {
+        ref_token: token.token,
+        email: token.email,
+        is_expired: false,
+        sync: true
+      }
     }
     return await this.updateUser(email, {google_ref: ref});
   }
@@ -100,7 +104,7 @@ class User {
     let user = await this.getUser({email:email});
     if (user.google_ref) {
       let ref = user.google_ref;
-      delete ref[gmail];
+      ref[gmail].sync = false;
       console.log(ref);
       if (user.google_events) {
         let g_events = user.google_events;

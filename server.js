@@ -604,7 +604,7 @@ router.get('/sync/google' , auth, async (req, res) => {
     for (const k in user.google_ref) {
       if (Object.hasOwnProperty.call(user.google_ref, k)) {
         const i = user.google_ref[k];
-        if (i.is_expired) continue;
+        if (i.is_expired || !i.sync) continue;
         try {
           let data = await axios({
             method: 'post',
@@ -681,7 +681,7 @@ router.post('/audio',  async  (req,res) => {
       // return;
     }
     let f = 'audio.wav' + uuidv4();
-
+    console.log("audio recevied");
     fs.writeFileSync(f,req.body.audio, 'base64');
     const handle = new Leopard(process.env.PICOKEY);
     const result = handle.processFile(f);
@@ -786,7 +786,7 @@ passport.use(new GoogleStrategy({
     callbackURL: process.env.CALLBACK_URL
   },
   async function(accessToken, refreshToken, profile, done) {
-      console.log("refresh" + refreshToken);
+      console.log("refresh" + accessToken);
       const email = profile.emails[0].value;
       const data ={email: email, token: refreshToken};
       // console.log(data);
@@ -822,6 +822,7 @@ app.get('/auth/google/callback',
       res.status(200).send("<h1>Sync failed, appemail is invalid!</h1>");
       return;
     }
+    console.log(req.session);
     User.updateGoogleRefreshToken(appemail, {email: email, token: token});
 
     res.status(200).send(`<h1>Authorized google calendar events of ${email} into ${appemail} accounts success! </h1>`)
