@@ -539,7 +539,7 @@ router.get('/tasks/get',auth,async(req,res) => {
       for (const k in user.google_ref) {
         if (Object.hasOwnProperty.call(user.google_ref, k)) {
           const i = user.google_ref[k];
-          if (i.is_expired) continue;
+          if (i.is_expired || !i.sync) continue;
           try {
             let data = await axios({
               method: 'post',
@@ -630,7 +630,7 @@ router.post('/sync/remove', auth, async (req,res) => {
 
 router.get('/sync/google' , auth, async (req, res) => {
 
-  
+  console.log("syncGhere");
   let user = req.user;
   const email = req.user.email;
 
@@ -638,7 +638,10 @@ router.get('/sync/google' , auth, async (req, res) => {
     for (const k in user.google_ref) {
       if (Object.hasOwnProperty.call(user.google_ref, k)) {
         const i = user.google_ref[k];
-        if (i.is_expired || !i.sync) continue;
+        if (i.is_expired || !i.sync) {
+          console.log("nosync:" + k);
+          continue;
+        }
         try {
           let data = await axios({
             method: 'post',
