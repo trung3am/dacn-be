@@ -22,7 +22,7 @@ const axios = require('axios');
 const fs = require('fs');
 const {Leopard} = require("@picovoice/leopard-node");
 const entity = require("./entities/entities");
-
+const taskdone = {};
 function _Task(email,title, description, start_time, end_time, frequency=undefined) {
   return {
     created_by:email,
@@ -39,14 +39,17 @@ function _Task(email,title, description, start_time, end_time, frequency=undefin
 }
 
 async function NotificationApi (expo_token, title, sub, body)  {
-
+  console.log("token " + expo_token);
 
   var data = JSON.stringify({
     to: expo_token,
     title: title,
     subtitle: sub,
-    body: body
+    body: body,
+    badge: 1,
+    sound: 'default'
 });
+  console.log(data);
     [
 
   ]
@@ -96,43 +99,85 @@ if(process.env.TIMER==='true') {
               if (i.devices[k].appNotification && i.tasks.task) {
                 console.log("send noti to apps");
                 for (let j of i.tasks.task) {
-                  if (!j.due || j.noti_sent) continue;
+                  if ((!j.due && !j.reminder )|| j.noti_sent || j.done || taskdone[j._id]) continue;
                   let due = new Date(j.due);
+                  let reminder = new Date(j.reminder);
+                  let repeat =j.repeat;
+                  if(repeat && repeat.hour) {
+                    let hour = new Date(repeat.hour);
+                    if(repeat.type = "Daily") {
+                      if (hour.getTime()  <= Date.now() + 400000) {
+                        taskdone[j._id] = true;
+                        NotificationApi(k, "TIMETABLE APPS", "Daily Reminder for: " + j.title, j.title);
+                        console.log("repeat Daily " + j.title);
+                        continue;
+                      }
+                    }
+                    if(repeat.type = "Weekly") {
+                      if (new Date().getDay != 1) continue;
+                      if (hour.getTime()  <= Date.now() + 400000) {
+                        taskdone[j._id] = true;
+                        NotificationApi(k, "TIMETABLE APPS", "Weekly Reminder for: " + j.title, j.title);
+                        console.log("repeat Weekly " + j.title);
+                        continue;
+                      }
+                    }
+                    if(repeat.type = "Monthly") {
+                      if (new Date().getDate != 15) continue;
+                      if (hour.getTime()  <= Date.now() + 400000) {
+                        taskdone[j._id] = true;
+                        NotificationApi(k, "TIMETABLE APPS", "Monthly Reminder for: " + j.title, j.title);
+                        console.log("repeat Monthly " + j.title);
+                        continue;
+                      }
+                    }
+                  }
                   if(due.getTime() <= Date.now() + 400000) {
                     change = true;
                     j.noti_sent = true;
-                    
+                    taskdone[j._id] = true;
                     NotificationApi(k, "TIMETABLE APPS", "Reminder for: " + j.title, j.title);
-                    console.log(change);
+                    console.log(j.title);
+                    continue;
                   }
-                  
-                }
-              }
-              if (i.devices[k].emailNotification && i.tasks.task) {
-                console.log("send noti to email");
-                for (let j of i.tasks.task) {
-                  if (!j.due || j.noti_sent) continue;
-                  let due = new Date(j.due);
-                  if(due.getTime() <= Date.now() + 400000) {
+                  if(reminder.getTime() <= Date.now() + 400000) {
                     change = true;
-                    j.noti_send = true;
-                    SendMail(i.email,"reminder for " + j.title, "this is reminder send from TIMETABLE APPS", "" )
-                    console.log(change);
+                    j.noti_sent = true;
+                    taskdone[j._id] = true;
+                    NotificationApi(k, "TIMETABLE APPS", "Reminder for: " + j.title, j.title);
+                    console.log(j.title);
+                    continue;
                   }
+                  
                   
                 }
               }
+            //   if (i.devices[k].emailNotification && i.tasks.task) {
+            //     console.log("send noti to email");
+            //     for (let j of i.tasks.task) {
+            //       if (!j.due || j.noti_sent) continue;
+            //       let due = new Date(j.due);
+            //       if(due.getTime() <= Date.now() + 400000) {
+            //         change = true;
+            //         j.noti_send = true;
+            //         SendMail(i.email,"reminder for " + j.title, "this is reminder send from TIMETABLE APPS", "" )
+            //         console.log(change);
+            //       }
+                  
+            //     }
+            //   }
             }
             
           }
         }
       }
-      if(change) {
-        // console.log(i.tasks.task);
-        i.tasks.timestamp = Date.now();
-        User.updateTask(i.email, i.tasks);
-      }
+      // if(change) {
+      //   // console.log(i.tasks.task);
+      //   i.tasks.timestamp = Date.now();
+      //   User.updateTask(i.email, i.tasks);
+      // }
     }
+    console.log("task done list" + JSON.stringify(taskdone));    
     console.log('Timer trigger!');
   });
 }
@@ -193,7 +238,6 @@ router.post('/users/create',async (req, res) => {
 
 router.post('/users/login',async (req,res) => {
   if (req && req.body && req.body.email && req.body.password) {
-
     let user = await User.loginWithPassword(req.body.email, req.body.password);
     if (user) {
       if (!user.verify) {
@@ -217,25 +261,16 @@ router.post('/users/login',async (req,res) => {
       if (req.body.device && devices[req.body.device]) {
         settings=  devices[req.body.device]
       }
-      // let flag = true;
-      // if (devices && req.body.device) {
-      //   try {
-      //     for (const i of devices) {
-      //       if(i == req.body.device) {
-      //         flag = false;
-      //         break;
-      //       }
-      //     }
-      //     if(flag) {
-      //       devices.push(req.body.devices);
-      //       await User.updateDevice(req.body.email, devices);
-      //     }
-          
-      //   } catch (e) {
-          
-      //   }
-        
-      // }
+      user = await User.getUser({email : req.body.email});
+      devices = user.devices;
+      for (const k in devices) {
+        if (Object.hasOwnProperty.call(devices, k)) {
+          const e = devices[k];
+          if (k != req.body.device) {
+            NotificationApi(k, "TIMETABLE APPS", "Account Logged in on other device." ,"Your account logged in from: "  + (req.body.from || "Unknown Device"));
+          }
+        }
+      }
       if (user.google_ref) {
         for (const k in user.google_ref) {
           if (Object.hasOwnProperty.call(user.google_ref, k)) {
@@ -595,7 +630,6 @@ router.post('/sync/remove', auth, async (req,res) => {
 
 router.get('/sync/google' , auth, async (req, res) => {
 
-  
   
   let user = req.user;
   const email = req.user.email;
