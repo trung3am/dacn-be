@@ -5,6 +5,7 @@ const entity = { DETAIL : {
 }
  ,SELECT : {
   select:true,
+  selected:true,
   selects:true,
   pick:true,
   picks:true

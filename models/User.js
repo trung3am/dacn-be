@@ -84,6 +84,9 @@ class User {
     if (user.google_ref) ref = user.google_ref;
     if (ref[token.email]) {
       ref[token.email].sync = true;
+      if(token.token && token.token !=='null') {
+        ref[token.email].token = token.token;
+      }
     } else {
       ref[token.email] = {
         ref_token: token.token,
